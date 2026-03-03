@@ -1,0 +1,23 @@
+.pageGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.panelTitle {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: #111827;
+}
+
+.panelText {
+  margin: 0;
+  color: #4b5563;
+  font-size: 14px;
+}
