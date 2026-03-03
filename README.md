@@ -152,9 +152,10 @@ Please maintain the existing architecture patterns (main/renderer separation, no
 
 ## License & Credits
 
-**Author:** NMD  
-**License:** *(Add license here - e.g., MIT, GPL, etc.)*
+**License:** MIT License  
+You are free to use, modify, and distribute this software under the terms of the MIT License.
 
+**Author:** N.M.D  
 ---
 
 ## Support
