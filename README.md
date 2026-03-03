@@ -136,12 +136,6 @@ SimpleLedger/
 
 ---
 
-## Current Development Phase
-
-**Phase 1 (COMPLETE):** Foundation + skeleton UI  
-**Phase 2 (NEXT):** Accounts & Categories CRUD operations
-
----
 
 ## Contributing
 
