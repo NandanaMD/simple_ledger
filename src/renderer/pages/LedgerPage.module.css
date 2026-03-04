@@ -46,6 +46,10 @@
   gap: 10px;
 }
 
+.formGridFullSpan {
+  grid-column: 1 / -1;
+}
+
 .input,
 .select,
 .textarea {

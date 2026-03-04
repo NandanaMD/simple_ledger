@@ -131,6 +131,29 @@ export const AccountsPage = () => {
     setShowAccountModal(true);
   };
 
+  const closeAccountModal = () => {
+    setShowAccountModal(false);
+    if (editingId !== null) {
+      resetForm();
+    }
+  };
+
+  useEffect(() => {
+    if (!showAccountModal) {
+      return;
+    }
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeAccountModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, [showAccountModal, editingId]);
+
   const submitAccount = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
@@ -525,12 +548,7 @@ export const AccountsPage = () => {
               <button
                 className={styles.button}
                 type="button"
-                onClick={() => {
-                  setShowAccountModal(false);
-                  if (editingId !== null) {
-                    resetForm();
-                  }
-                }}
+                onClick={closeAccountModal}
               >
                 Close
               </button>

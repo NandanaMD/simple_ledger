@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import type {
   AccountWithBalance,
   LabourEntry,
@@ -46,6 +46,13 @@ interface BulkWorkerRow {
 
 const newWorkerRow = (id: number): BulkWorkerRow => ({ id, name: '', notes: '' });
 
+const getEntryImpact = (entryType: LabourEntryType, amount: number): number => {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return 0;
+  }
+  return entryType === 'WAGE' ? amount : -amount;
+};
+
 const defaultEntryForm: LabourEntryInput = {
   labourerId: 0,
   entryType: 'WAGE',
@@ -81,6 +88,31 @@ export const LabourPage = () => {
     }
     return labourers.find((labourer) => labourer.id === selectedLabourerId)?.name ?? 'Selected worker';
   }, [labourers, selectedLabourerId]);
+
+  const selectedEntryLabourer = useMemo(
+    () => labourers.find((labourer) => labourer.id === entryForm.labourerId) ?? null,
+    [labourers, entryForm.labourerId],
+  );
+
+  const editingEntry = useMemo(
+    () => (editingEntryId === null ? null : entries.find((entry) => entry.id === editingEntryId) ?? null),
+    [entries, editingEntryId],
+  );
+
+  const liveProjectedPending = useMemo(() => {
+    if (!selectedEntryLabourer) {
+      return 0;
+    }
+
+    const existingImpact =
+      editingEntry && editingEntry.labourerId === selectedEntryLabourer.id
+        ? getEntryImpact(editingEntry.entryType, editingEntry.amount)
+        : 0;
+
+    const baselinePending = selectedEntryLabourer.pending - existingImpact;
+    const nextImpact = getEntryImpact(entryForm.entryType, Number(entryForm.amount));
+    return baselinePending + nextImpact;
+  }, [selectedEntryLabourer, editingEntry, entryForm.entryType, entryForm.amount]);
 
   useEffect(() => {
     if (!toast) {
@@ -233,7 +265,32 @@ export const LabourPage = () => {
     resetWorkerModal();
   };
 
-  const submitBulkWorkers = async () => {
+  useEffect(() => {
+    if (!entryModalOpen && !workerModalOpen) {
+      return;
+    }
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      event.preventDefault();
+      if (entryModalOpen) {
+        closeEntryModal();
+        return;
+      }
+      if (workerModalOpen) {
+        closeWorkerModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, [entryModalOpen, workerModalOpen, selectedLabourerId, labourers]);
+
+  const submitBulkWorkers = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     try {
       const payloads = workerRows
         .map((row) => ({ name: row.name.trim(), notes: row.notes.trim() }))
@@ -251,7 +308,8 @@ export const LabourPage = () => {
     }
   };
 
-  const submitEntry = async () => {
+  const submitEntry = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     try {
       if (!entryForm.labourerId) {
         throw new Error('Select a labourer before saving entry.');
@@ -502,7 +560,7 @@ export const LabourPage = () => {
 
       {workerModalOpen ? (
         <div className={styles.modalOverlay}>
-          <div className={styles.modalCard}>
+          <form className={styles.modalCard} onSubmit={submitBulkWorkers}>
             <div className={styles.modalHeader}>
               <h2 className={styles.panelTitle}>Create Workers (Bulk)</h2>
               <button className={styles.button} type="button" onClick={closeWorkerModal}>
@@ -534,17 +592,17 @@ export const LabourPage = () => {
               <button className={styles.button} type="button" onClick={addWorkerRow}>
                 + Add Row
               </button>
-              <button className={`${styles.button} ${styles.buttonPrimary}`} type="button" onClick={submitBulkWorkers}>
+              <button className={`${styles.button} ${styles.buttonPrimary}`} type="submit">
                 Save Workers
               </button>
             </div>
-          </div>
+          </form>
         </div>
       ) : null}
 
       {entryModalOpen ? (
         <div className={styles.modalOverlay}>
-          <div className={styles.modalCard}>
+          <form className={styles.modalCard} onSubmit={submitEntry}>
             <div className={styles.modalHeader}>
               <h2 className={styles.panelTitle}>{editingEntryId === null ? 'Add Labour Entry' : 'Edit Labour Entry'}</h2>
               <button className={styles.button} type="button" onClick={closeEntryModal}>
@@ -552,89 +610,125 @@ export const LabourPage = () => {
               </button>
             </div>
 
-            <div className={styles.formGrid}>
-              <select
-                className={styles.select}
-                value={entryForm.labourerId}
-                onChange={(event) =>
-                  setEntryForm((previous) => ({ ...previous, labourerId: Number(event.target.value) }))
-                }
-              >
-                <option value={0}>Select worker</option>
-                {labourers.map((labourer) => (
-                  <option key={labourer.id} value={labourer.id}>
-                    {labourer.name}
-                  </option>
-                ))}
-              </select>
+            <div className={styles.modalFormStack}>
+              <div className={styles.formField}>
+                <label className={styles.fieldLabel}>1. Select worker</label>
+                <select
+                  className={styles.select}
+                  value={entryForm.labourerId}
+                  onChange={(event) =>
+                    setEntryForm((previous) => ({ ...previous, labourerId: Number(event.target.value) }))
+                  }
+                >
+                  <option value={0}>Select worker</option>
+                  {labourers.map((labourer) => (
+                    <option key={labourer.id} value={labourer.id}>
+                      {labourer.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <select
-                className={styles.select}
-                value={entryForm.entryType}
-                onChange={(event) =>
-                  setEntryForm((previous) => ({
-                    ...previous,
-                    entryType: event.target.value as LabourEntryType,
-                    paymentAccountId: event.target.value === 'WAGE' ? 0 : previous.paymentAccountId,
-                  }))
-                }
-              >
-                <option value="WAGE">Wage</option>
-                <option value="ADVANCE">Advance</option>
-                <option value="PAYMENT">Payment</option>
-              </select>
+              <div className={styles.modalFormGrid}>
+                <div className={styles.formField}>
+                  <label className={styles.fieldLabel}>2. Entry type</label>
+                  <select
+                    className={styles.select}
+                    value={entryForm.entryType}
+                    onChange={(event) =>
+                      setEntryForm((previous) => ({
+                        ...previous,
+                        entryType: event.target.value as LabourEntryType,
+                        paymentAccountId: event.target.value === 'WAGE' ? 0 : previous.paymentAccountId,
+                      }))
+                    }
+                  >
+                    <option value="WAGE">Wage</option>
+                    <option value="ADVANCE">Advance</option>
+                    <option value="PAYMENT">Payment</option>
+                  </select>
+                </div>
 
-              <select
-                className={styles.select}
-                value={entryForm.paymentAccountId}
-                disabled={entryForm.entryType === 'WAGE'}
-                onChange={(event) =>
-                  setEntryForm((previous) => ({ ...previous, paymentAccountId: Number(event.target.value) }))
-                }
-              >
-                <option value={0}>Bank (optional)</option>
-                {bankAccounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
+                <div className={styles.formField}>
+                  <label className={styles.fieldLabel}>3. Amount to enter</label>
+                  <input
+                    className={styles.input}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Enter amount"
+                    value={Number.isFinite(entryForm.amount) ? entryForm.amount : ''}
+                    onChange={(event) =>
+                      setEntryForm((previous) => ({
+                        ...previous,
+                        amount: event.target.value === '' ? Number.NaN : Number(event.target.value),
+                      }))
+                    }
+                  />
+                </div>
 
-              <input
-                className={styles.input}
-                type="number"
-                step="0.01"
-                placeholder="Amount"
-                value={Number.isFinite(entryForm.amount) ? entryForm.amount : ''}
-                onChange={(event) =>
-                  setEntryForm((previous) => ({
-                    ...previous,
-                    amount: event.target.value === '' ? Number.NaN : Number(event.target.value),
-                  }))
-                }
-              />
+                <div className={styles.formField}>
+                  <label className={styles.fieldLabel}>4. Entry date</label>
+                  <input
+                    className={styles.input}
+                    type="date"
+                    value={entryForm.entryDate}
+                    onChange={(event) => setEntryForm((previous) => ({ ...previous, entryDate: event.target.value }))}
+                  />
+                </div>
+              </div>
 
-              <input
-                className={styles.input}
-                type="date"
-                value={entryForm.entryDate}
-                onChange={(event) => setEntryForm((previous) => ({ ...previous, entryDate: event.target.value }))}
-              />
+              <div className={styles.formField}>
+                <label className={styles.fieldLabel}>5. Bank account (optional for Advance/Payment)</label>
+                <select
+                  className={styles.select}
+                  value={entryForm.paymentAccountId}
+                  disabled={entryForm.entryType === 'WAGE'}
+                  onChange={(event) =>
+                    setEntryForm((previous) => ({ ...previous, paymentAccountId: Number(event.target.value) }))
+                  }
+                >
+                  <option value={0}>Bank (optional)</option>
+                  {bankAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <input
-                className={styles.input}
-                placeholder="Note"
-                value={entryForm.note}
-                onChange={(event) => setEntryForm((previous) => ({ ...previous, note: event.target.value }))}
-              />
+              <div className={styles.formField}>
+                <label className={styles.fieldLabel}>6. Note (optional)</label>
+                <input
+                  className={styles.input}
+                  placeholder="Note"
+                  value={entryForm.note}
+                  onChange={(event) => setEntryForm((previous) => ({ ...previous, note: event.target.value }))}
+                />
+              </div>
+
+              <div className={styles.modalInsight}>
+                <p className={styles.fieldLabel}>Live Balance After This Entry (Wage - Paid)</p>
+                <p className={`${styles.summaryValue} ${amountClassName(liveProjectedPending)}`}>
+                  {selectedEntryLabourer ? signedCurrency(liveProjectedPending) : '-'}
+                </p>
+                {selectedEntryLabourer ? (
+                  <p className={styles.valueHint}>
+                    Current: {signedCurrency(selectedEntryLabourer.pending)}
+                  </p>
+                ) : null}
+                {selectedEntryLabourer && liveProjectedPending < 0 ? (
+                  <p className={styles.valueHint}>Worker owes you</p>
+                ) : null}
+              </div>
             </div>
 
             <div className={styles.compactActions}>
-              <button className={`${styles.button} ${styles.buttonPrimary}`} type="button" onClick={submitEntry}>
+              <button className={`${styles.button} ${styles.buttonPrimary}`} type="submit">
                 {editingEntryId === null ? 'Create Entry' : 'Update Entry'}
               </button>
             </div>
-          </div>
+          </form>
         </div>
       ) : null}
 

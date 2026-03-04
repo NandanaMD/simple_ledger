@@ -51,6 +51,7 @@
   "build": {
     "appId": "com.simpleledger.desktop",
     "productName": "SimpleLedger",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
     "icon": "build/icons/sl_icon.ico",
     "files": [
       "dist/**/*",

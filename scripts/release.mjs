@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const run = (command) => {
@@ -20,6 +20,25 @@ const isSemverLike = (value) =>
 
 const readPackageJson = () => JSON.parse(readFileSync('package.json', 'utf-8'));
 
+const readLatestYmlInfo = (latestYmlPath) => {
+  const latestYml = readFileSync(latestYmlPath, 'utf-8');
+  const versionLine = latestYml.match(/^version:\s*(.+)$/m)?.[1]?.trim();
+  const pathLine = latestYml.match(/^path:\s*(.+)$/m)?.[1]?.trim();
+
+  if (!versionLine) {
+    throw new Error('Unable to read version from dist/latest.yml.');
+  }
+
+  if (!pathLine) {
+    throw new Error('Unable to read installer path from dist/latest.yml.');
+  }
+
+  return {
+    version: versionLine,
+    installerFileName: pathLine,
+  };
+};
+
 const ensureVersionChanged = (previousVersion, nextVersion) => {
   if (previousVersion === nextVersion) {
     throw new Error(
@@ -28,59 +47,42 @@ const ensureVersionChanged = (previousVersion, nextVersion) => {
   }
 };
 
-const verifyBuiltVersionArtifacts = (version, productName) => {
-  const expectedInstaller = path.resolve('dist', `${productName} Setup ${version}.exe`);
-  if (!existsSync(expectedInstaller)) {
-    throw new Error(
-      `Expected installer not found for version ${version}: ${expectedInstaller}. Build output version does not match package version.`,
-    );
-  }
-
+const verifyBuiltVersionArtifacts = (version) => {
   const latestYmlPath = path.resolve('dist', 'latest.yml');
   if (!existsSync(latestYmlPath)) {
     throw new Error(`Missing latest.yml at ${latestYmlPath}.`);
   }
 
-  const latestYml = readFileSync(latestYmlPath, 'utf-8');
-  const versionLine = latestYml.match(/^version:\s*(.+)$/m)?.[1]?.trim();
-  if (!versionLine) {
-    throw new Error('Unable to read version from dist/latest.yml.');
-  }
+  const latestYmlInfo = readLatestYmlInfo(latestYmlPath);
 
-  if (versionLine !== version) {
+  if (latestYmlInfo.version !== version) {
     throw new Error(
-      `latest.yml version mismatch. Expected ${version}, got ${versionLine}.`,
+      `latest.yml version mismatch. Expected ${version}, got ${latestYmlInfo.version}.`,
     );
   }
+
+  const expectedInstaller = path.resolve('dist', latestYmlInfo.installerFileName);
+  if (!existsSync(expectedInstaller)) {
+    throw new Error(
+      `Expected installer not found for version ${version}: ${expectedInstaller}. Build output version does not match latest.yml path.`,
+    );
+  }
+
+  return latestYmlInfo;
 };
 
-const collectReleaseAssets = (rootDir) => {
+const collectReleaseAssets = (rootDir, installerFileName) => {
   if (!existsSync(rootDir)) {
     return [];
   }
 
-  const wanted = [/\.exe$/i, /\.blockmap$/i, /latest.*\.ya?ml$/i];
-  const assets = [];
-  const stack = [rootDir];
+  const candidates = [
+    path.join(rootDir, 'latest.yml'),
+    path.join(rootDir, installerFileName),
+    path.join(rootDir, `${installerFileName}.blockmap`),
+  ];
 
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) {
-      continue;
-    }
-
-    const entries = readdirSync(current, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(current, entry.name);
-      if (entry.isDirectory()) {
-        stack.push(fullPath);
-      } else if (wanted.some((pattern) => pattern.test(entry.name))) {
-        assets.push(fullPath);
-      }
-    }
-  }
-
-  return assets;
+  return candidates.filter((candidate) => existsSync(candidate));
 };
 
 const inputVersion = process.argv[2] ?? 'patch';
@@ -118,14 +120,13 @@ try {
 
   const packageJson = readPackageJson();
   const version = packageJson.version;
-  const productName = packageJson.build?.productName ?? packageJson.name;
   ensureVersionChanged(previousVersion, version);
 
   const tag = `v${version}`;
   console.log(`\nVersion bumped: ${previousVersion} -> ${version}`);
 
   run('npm run dist');
-  verifyBuiltVersionArtifacts(version, productName);
+  const latestYmlInfo = verifyBuiltVersionArtifacts(version);
 
   run('git add package.json package-lock.json');
   run(`git commit -m ${quote(`release: ${tag}`)}`);
@@ -133,7 +134,7 @@ try {
   run('git push');
   run(`git push origin ${tag}`);
 
-  const assets = collectReleaseAssets(path.resolve('dist'));
+  const assets = collectReleaseAssets(path.resolve('dist'), latestYmlInfo.installerFileName);
   if (assets.length === 0) {
     console.warn('\nNo release assets found under dist/. Creating tag release without attached binaries.');
   }

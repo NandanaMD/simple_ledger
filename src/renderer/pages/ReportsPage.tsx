@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Category, LedgerTransaction, TransactionType } from '../../shared/types/ledger';
+import type { AccountWithBalance, Category, LedgerTransaction, TransactionType } from '../../shared/types/ledger';
 import styles from './LedgerPage.module.css';
 
 const currency = new Intl.NumberFormat('en-IN', {
@@ -11,6 +11,7 @@ const currency = new Intl.NumberFormat('en-IN', {
 type ReportPeriodFilter = 'THIS_MONTH' | 'LAST_3_MONTHS' | 'THIS_YEAR' | 'ALL';
 type ReportTypeFilter = 'ALL' | TransactionType;
 type CategoryFilter = 'ALL' | 'UNCATEGORIZED' | `CATEGORY:${number}`;
+type BankFilter = 'ALL' | number;
 
 interface CategoryFilterOption {
   value: CategoryFilter;
@@ -84,10 +85,12 @@ const signedAmount = (type: TransactionType, amount: number): string => {
 };
 
 export const ReportsPage = () => {
+  const [accounts, setAccounts] = useState<AccountWithBalance[]>([]);
   const [transactions, setTransactions] = useState<LedgerTransaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [periodFilter, setPeriodFilter] = useState<ReportPeriodFilter>('THIS_MONTH');
   const [typeFilter, setTypeFilter] = useState<ReportTypeFilter>('ALL');
+  const [bankFilter, setBankFilter] = useState<BankFilter>('ALL');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('ALL');
   const [toast, setToast] = useState('');
 
@@ -102,7 +105,12 @@ export const ReportsPage = () => {
 
   const loadTransactions = async () => {
     try {
-      const [transactionData, categoryData] = await Promise.all([window.api.listTransactions(), window.api.listCategories()]);
+      const [accountData, transactionData, categoryData] = await Promise.all([
+        window.api.listAccounts(),
+        window.api.listTransactions(),
+        window.api.listCategories(),
+      ]);
+      setAccounts(accountData);
       setTransactions(transactionData);
       setCategories(categoryData);
     } catch (error) {
@@ -114,6 +122,21 @@ export const ReportsPage = () => {
     void loadTransactions();
   }, []);
 
+  const bankAccounts = useMemo(
+    () => accounts.filter((account) => account.accountType === 'BANK'),
+    [accounts],
+  );
+
+  useEffect(() => {
+    if (bankFilter === 'ALL') {
+      return;
+    }
+
+    if (!bankAccounts.some((account) => account.id === bankFilter)) {
+      setBankFilter('ALL');
+    }
+  }, [bankAccounts, bankFilter]);
+
   const transactionsByPeriodAndType = useMemo(() => {
     const filtered = transactions.filter((entry) => {
       if (!isWithinSelectedPeriod(entry.transactionDate, periodFilter)) {
@@ -122,6 +145,14 @@ export const ReportsPage = () => {
 
       if (typeFilter !== 'ALL' && entry.transactionType !== typeFilter) {
         return false;
+      }
+
+      if (bankFilter !== 'ALL') {
+        const isSourceMatch = entry.accountId === bankFilter;
+        const isDestinationMatch = entry.toAccountId === bankFilter;
+        if (!isSourceMatch && !isDestinationMatch) {
+          return false;
+        }
       }
 
       return true;
@@ -136,7 +167,7 @@ export const ReportsPage = () => {
     });
 
     return filtered;
-  }, [periodFilter, transactions, typeFilter]);
+  }, [bankFilter, periodFilter, transactions, typeFilter]);
 
   const categoryFilterGroups = useMemo<CategoryFilterGroup[]>(() => {
     const typeFilteredCategories =
@@ -267,11 +298,12 @@ export const ReportsPage = () => {
   const resetFilters = () => {
     setPeriodFilter('THIS_MONTH');
     setTypeFilter('ALL');
+    setBankFilter('ALL');
     setCategoryFilter('ALL');
   };
 
   const activeFiltersCount =
-    Number(periodFilter !== 'THIS_MONTH') + Number(typeFilter !== 'ALL') + Number(categoryFilter !== 'ALL');
+    Number(periodFilter !== 'THIS_MONTH') + Number(typeFilter !== 'ALL') + Number(bankFilter !== 'ALL') + Number(categoryFilter !== 'ALL');
 
   return (
     <div className={styles.sectionGrid}>
@@ -315,6 +347,27 @@ export const ReportsPage = () => {
               {(['ALL', 'INCOME', 'EXPENSE', 'TRANSFER'] as ReportTypeFilter[]).map((type) => (
                 <option key={type} value={type}>
                   {typeLabels[type]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className={styles.reportFilterField}>
+            <span className={styles.reportFilterLabel}>Bank</span>
+            <select
+              className={`${styles.reportFilterSelect} ${bankFilter !== 'ALL' ? styles.reportFilterSelectActive : ''}`}
+              value={bankFilter}
+              onChange={(event) => {
+                const value = event.target.value;
+                setBankFilter(value === 'ALL' ? 'ALL' : Number(value));
+              }}
+              aria-label="Filter by bank"
+              title="Filter by bank"
+            >
+              <option value="ALL">All Banks</option>
+              {bankAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
                 </option>
               ))}
             </select>

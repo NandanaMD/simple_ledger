@@ -200,6 +200,41 @@ export const TransactionsPage = () => {
     setShowCategoryCreateModal(true);
   };
 
+  const closeTransactionModal = () => {
+    setShowTransactionModal(false);
+    if (editingId !== null) {
+      resetForm();
+    }
+  };
+
+  const closeCategoryCreateModal = () => {
+    setShowCategoryCreateModal(false);
+  };
+
+  useEffect(() => {
+    if (!showTransactionModal && !showCategoryCreateModal) {
+      return;
+    }
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      event.preventDefault();
+      if (showCategoryCreateModal) {
+        closeCategoryCreateModal();
+        return;
+      }
+      if (showTransactionModal) {
+        closeTransactionModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, [showTransactionModal, showCategoryCreateModal, editingId]);
+
   const submitCategoryCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
@@ -695,12 +730,7 @@ export const TransactionsPage = () => {
               <button
                 className={styles.button}
                 type="button"
-                onClick={() => {
-                  setShowTransactionModal(false);
-                  if (editingId !== null) {
-                    resetForm();
-                  }
-                }}
+                onClick={closeTransactionModal}
               >
                 Close
               </button>
@@ -911,7 +941,7 @@ export const TransactionsPage = () => {
           <div className={styles.modalCardSmall}>
             <div className={styles.modalHeader}>
               <h3 className={styles.panelTitle}>Add Category</h3>
-              <button className={styles.button} type="button" onClick={() => setShowCategoryCreateModal(false)}>
+              <button className={styles.button} type="button" onClick={closeCategoryCreateModal}>
                 Close
               </button>
             </div>
@@ -965,7 +995,7 @@ export const TransactionsPage = () => {
                 <button
                   className={styles.button}
                   type="button"
-                  onClick={() => setShowCategoryCreateModal(false)}
+                  onClick={closeCategoryCreateModal}
                 >
                   Cancel
                 </button>

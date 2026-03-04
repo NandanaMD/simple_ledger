@@ -168,6 +168,41 @@ export const CategoriesPage = () => {
     setShowSubcategoryModal(true);
   };
 
+  const closeCategoryModal = () => {
+    setShowCategoryModal(false);
+    setEditingCategoryId(null);
+  };
+
+  const closeSubcategoryModal = () => {
+    setShowSubcategoryModal(false);
+    setEditingSubcategoryId(null);
+    setActiveParentCategoryId(null);
+  };
+
+  useEffect(() => {
+    if (!showCategoryModal && !showSubcategoryModal) {
+      return;
+    }
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      event.preventDefault();
+      if (showSubcategoryModal) {
+        closeSubcategoryModal();
+        return;
+      }
+      if (showCategoryModal) {
+        closeCategoryModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, [showCategoryModal, showSubcategoryModal]);
+
   const createMainCategory = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
@@ -363,10 +398,7 @@ export const CategoriesPage = () => {
               <button
                 className={styles.button}
                 type="button"
-                onClick={() => {
-                  setShowCategoryModal(false);
-                  setEditingCategoryId(null);
-                }}
+                onClick={closeCategoryModal}
               >
                 Close
               </button>
@@ -399,10 +431,7 @@ export const CategoriesPage = () => {
                 <button
                   className={styles.button}
                   type="button"
-                  onClick={() => {
-                    setShowCategoryModal(false);
-                    setEditingCategoryId(null);
-                  }}
+                  onClick={closeCategoryModal}
                 >
                   Cancel
                 </button>
@@ -420,11 +449,7 @@ export const CategoriesPage = () => {
               <button
                 className={styles.button}
                 type="button"
-                onClick={() => {
-                  setShowSubcategoryModal(false);
-                  setEditingSubcategoryId(null);
-                  setActiveParentCategoryId(null);
-                }}
+                onClick={closeSubcategoryModal}
               >
                 Close
               </button>
@@ -450,11 +475,7 @@ export const CategoriesPage = () => {
                 <button
                   className={styles.button}
                   type="button"
-                  onClick={() => {
-                    setShowSubcategoryModal(false);
-                    setEditingSubcategoryId(null);
-                    setActiveParentCategoryId(null);
-                  }}
+                  onClick={closeSubcategoryModal}
                 >
                   Cancel
                 </button>

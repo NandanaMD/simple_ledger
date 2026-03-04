@@ -10,6 +10,7 @@ const currency = new Intl.NumberFormat('en-IN', {
 
 type EntrySort = 'date' | 'amount' | 'type' | 'name';
 type SummaryMode = 'WEEKLY' | 'MONTHLY';
+type EntryTypeFilter = 'ALL' | LabourEntryType;
 
 const toMonthKey = (date: Date): string => {
   const year = date.getFullYear();
@@ -67,14 +68,14 @@ const entryTypePillClass = (entryType: LabourEntryType): string => {
 };
 
 const entryAmountClass = (entryType: LabourEntryType): string => {
-  if (entryType === 'PAYMENT') {
+  if (entryType === 'PAYMENT' || entryType === 'ADVANCE') {
     return styles.reportAmountExpense;
   }
   return styles.reportAmountIncome;
 };
 
 const signedEntryAmount = (entry: LabourEntry): string => {
-  if (entry.entryType === 'PAYMENT') {
+  if (entry.entryType === 'PAYMENT' || entry.entryType === 'ADVANCE') {
     return `- ${currency.format(entry.amount)}`;
   }
   return `+ ${currency.format(entry.amount)}`;
@@ -139,7 +140,7 @@ export const LabourRecordsPage = () => {
   const [summaries, setSummaries] = useState<LabourSummaryResponse>({ weekly: [], monthly: [] });
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<EntrySort>('date');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [entryTypeFilter, setEntryTypeFilter] = useState<EntryTypeFilter>('ALL');
   const [selectedLabourerId, setSelectedLabourerId] = useState<number>(0);
   const [selectedMonth, setSelectedMonth] = useState<string>(toMonthKey(new Date()));
   const [monthOptions] = useState<string[]>(() => buildMonthOptions());
@@ -186,7 +187,9 @@ export const LabourRecordsPage = () => {
 
   const visibleEntries = useMemo(() => {
     const keyword = search.trim().toLowerCase();
-    const monthFiltered = entries.filter((entry) => entry.entryDate.startsWith(selectedMonth));
+    const monthFiltered = entries.filter(
+      (entry) => entry.entryDate.startsWith(selectedMonth) && (entryTypeFilter === 'ALL' || entry.entryType === entryTypeFilter),
+    );
     const filtered = keyword
       ? monthFiltered.filter(
           (entry) =>
@@ -209,11 +212,11 @@ export const LabourRecordsPage = () => {
       } else {
         compare = left.entryType.localeCompare(right.entryType);
       }
-      return sortDirection === 'asc' ? compare : -compare;
+      return -compare;
     });
 
     return filtered;
-  }, [entries, search, selectedMonth, sortBy, sortDirection]);
+  }, [entries, search, selectedMonth, sortBy, entryTypeFilter]);
 
   const hasSearch = search.trim().length > 0;
   const hasWorkerFilter = selectedLabourerId !== 0;
@@ -464,7 +467,7 @@ export const LabourRecordsPage = () => {
                 onClick={() => {
                   setSearch('');
                   setSortBy('date');
-                  setSortDirection('desc');
+                  setEntryTypeFilter('ALL');
                   setSelectedMonth(toMonthKey(new Date()));
                   setSelectedLabourerId(0);
                 }}
@@ -535,14 +538,16 @@ export const LabourRecordsPage = () => {
             </label>
 
             <label className={styles.reportFilterField}>
-              <span className={styles.reportFilterLabel}>Order</span>
+              <span className={styles.reportFilterLabel}>Entry Type</span>
               <select
-                className={styles.reportFilterSelect}
-                value={sortDirection}
-                onChange={(event) => setSortDirection(event.target.value as 'asc' | 'desc')}
+                className={`${styles.reportFilterSelect} ${entryTypeFilter !== 'ALL' ? styles.reportFilterSelectActive : ''}`}
+                value={entryTypeFilter}
+                onChange={(event) => setEntryTypeFilter(event.target.value as EntryTypeFilter)}
               >
-                <option value="desc">Descending</option>
-                <option value="asc">Ascending</option>
+                <option value="ALL">All Types</option>
+                <option value="WAGE">Wage</option>
+                <option value="ADVANCE">Advance</option>
+                <option value="PAYMENT">Payment</option>
               </select>
             </label>
           </div>
@@ -564,7 +569,10 @@ export const LabourRecordsPage = () => {
               <span className={`${styles.feedbackChip} ${hasSearch ? styles.feedbackChipActive : ''}`}>
                 Search: {hasSearch ? search.trim() : 'None'}
               </span>
-              <span className={styles.feedbackChip}>Sort: {sortBy} ({sortDirection})</span>
+              <span className={`${styles.feedbackChip} ${entryTypeFilter !== 'ALL' ? styles.feedbackChipActive : ''}`}>
+                Type: {entryTypeFilter === 'ALL' ? 'All' : entryTypeFilter}
+              </span>
+              <span className={styles.feedbackChip}>Sort: {sortBy} (desc)</span>
             </div>
           </div>
 
