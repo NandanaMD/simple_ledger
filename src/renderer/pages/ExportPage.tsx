@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ExportDataset, ExportFormat, ExportPeriod, ExportResult } from '../../shared/types/ledger';
+import type {
+  ExportDataset,
+  ExportFormat,
+  ExportPeriod,
+  ExportResult,
+} from '../../shared/types/ledger';
 import styles from './LedgerPage.module.css';
 
 type ExportTab = 'EXPORT' | 'HISTORY';
@@ -40,6 +45,8 @@ export const ExportPage = () => {
   const [format, setFormat] = useState<ExportFormat>('PDF');
   const [period, setPeriod] = useState<ExportPeriod>('THIS_MONTH');
   const [isExporting, setIsExporting] = useState(false);
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [result, setResult] = useState<ExportResult | null>(null);
   const [history, setHistory] = useState<ExportHistoryItem[]>([]);
   const [toast, setToast] = useState('');
@@ -124,6 +131,48 @@ export const ExportPage = () => {
     }
   };
 
+  const onBackup = async () => {
+    try {
+      setIsBackingUp(true);
+      await window.api.backupDatabase();
+      setToast('Backup completed successfully.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create backup.';
+      if (message.toLowerCase().includes('cancelled')) {
+        setToast('Backup cancelled.');
+      } else {
+        setToast(message);
+      }
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  const onRestore = async () => {
+    const confirmed = window.confirm(
+      'Restore will replace current ledger data with the selected backup file. Continue?',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setIsRestoring(true);
+      await window.api.restoreDatabase();
+      setToast('Restore completed. Please review your data and restart app if needed.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to restore backup.';
+      if (message.toLowerCase().includes('cancelled')) {
+        setToast('Restore cancelled.');
+      } else {
+        setToast(message);
+      }
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   return (
     <div className={styles.sectionGrid}>
       <article className={styles.panel}>
@@ -148,6 +197,33 @@ export const ExportPage = () => {
             <p className={styles.summaryValue}>Save File</p>
             <p className={styles.valueHint}>Pick location and complete export.</p>
           </div>
+        </div>
+      </article>
+
+      <article className={styles.panel}>
+        <div className={styles.panelHeader}>
+          <h2 className={styles.panelTitle}>Backup & Restore</h2>
+          <p className={styles.panelText}>Use quick actions without entering export flow.</p>
+        </div>
+
+        <div className={styles.formActions}>
+          <button
+            type="button"
+            className={styles.button}
+            onClick={onBackup}
+            disabled={isBackingUp}
+          >
+            {isBackingUp ? 'Backing up...' : 'Backup Now'}
+          </button>
+
+          <button
+            type="button"
+            className={styles.button}
+            onClick={onRestore}
+            disabled={isRestoring}
+          >
+            {isRestoring ? 'Restoring...' : 'Restore Backup'}
+          </button>
         </div>
       </article>
 

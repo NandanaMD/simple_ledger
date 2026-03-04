@@ -155,3 +155,14 @@ export interface ExportResult {
   format: ExportFormat;
   rowCount: number;
 }
+
+export interface BackupResult {
+  filePath: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export interface RestoreResult {
+  sourcePath: string;
+  restoredAt: string;
+}

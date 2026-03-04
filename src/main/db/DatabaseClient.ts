@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import { schemaSql } from './schema.js';
 
 let db: Database.Database | null = null;
+let databaseFilePath: string | null = null;
 
 const runSchema = (database: Database.Database): void => {
   const transaction = database.transaction(() => {
@@ -52,12 +53,14 @@ export const initializeDatabase = async (userDataPath: string): Promise<void> =>
 
   try {
     db = new Database(dbPath);
+    databaseFilePath = dbPath;
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
     runSchema(db);
     runMigrations(db);
   } catch (error) {
     db = null;
+    databaseFilePath = null;
     throw error;
   }
 };
@@ -68,4 +71,21 @@ export const getDatabase = (): Database.Database => {
   }
 
   return db;
+};
+
+export const getDatabasePath = (): string => {
+  if (!databaseFilePath) {
+    throw new Error('Database path is unavailable because the database is not initialized.');
+  }
+
+  return databaseFilePath;
+};
+
+export const closeDatabase = (): void => {
+  if (!db) {
+    return;
+  }
+
+  db.close();
+  db = null;
 };

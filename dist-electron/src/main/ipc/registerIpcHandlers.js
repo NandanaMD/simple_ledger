@@ -5,6 +5,7 @@ import { createCategory, deleteCategory, listCategories, updateCategory, } from 
 import { createTransaction, deleteTransaction, listTransactions, updateTransaction, } from '../services/TransactionService.js';
 import { getDashboardSummary } from '../services/DashboardService.js';
 import { exportRecords, openExportFile } from '../services/ExportService.js';
+import { backupDatabase, restoreDatabase } from '../services/BackupService.js';
 import { checkForAppUpdates, downloadAppUpdate, getUpdaterStatusSnapshot, installDownloadedUpdate, } from '../services/UpdateService.js';
 import { createLabourEntry, createLabourer, deleteLabourEntry, deleteLabourer, getLabourSummaries, listLabourEntries, listLabourers, updateLabourEntry, updateLabourer, } from '../services/LabourService.js';
 export const registerIpcHandlers = () => {
@@ -34,6 +35,8 @@ export const registerIpcHandlers = () => {
     ipcMain.handle('dashboard:summary', async () => getDashboardSummary());
     ipcMain.handle('export:records', async (_event, payload) => exportRecords(payload));
     ipcMain.handle('export:open-file', async (_event, filePath) => openExportFile(filePath));
+    ipcMain.handle('backup:create', async () => backupDatabase());
+    ipcMain.handle('backup:restore', async () => restoreDatabase());
     ipcMain.handle('updater:status', async () => getUpdaterStatusSnapshot());
     ipcMain.handle('updater:check', async () => checkForAppUpdates());
     ipcMain.handle('updater:download', async () => downloadAppUpdate());

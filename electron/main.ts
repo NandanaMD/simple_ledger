@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { initializeDatabase } from '../src/main/db/DatabaseClient.js';
 import { registerIpcHandlers } from '../src/main/ipc/registerIpcHandlers.js';
 import { initializeUpdater } from '../src/main/services/UpdateService.js';
+import { runAutoBackup } from '../src/main/services/BackupService.js';
+
+let hasQuitBackupRun = false;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,6 +43,11 @@ const createWindow = async (): Promise<void> => {
 
 const bootstrap = async (): Promise<void> => {
   await initializeDatabase(app.getPath('userData'));
+  try {
+    await runAutoBackup();
+  } catch (error) {
+    console.error('Auto backup at startup failed', error);
+  }
   registerIpcHandlers();
   await createWindow();
 };
@@ -61,4 +69,21 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', (event) => {
+  if (hasQuitBackupRun) {
+    return;
+  }
+
+  event.preventDefault();
+  hasQuitBackupRun = true;
+
+  void runAutoBackup()
+    .catch((error) => {
+      console.error('Auto backup on exit failed', error);
+    })
+    .finally(() => {
+      app.exit(0);
+    });
 });

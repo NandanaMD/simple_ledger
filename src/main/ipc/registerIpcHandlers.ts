@@ -20,6 +20,7 @@ import {
 } from '../services/TransactionService.js';
 import { getDashboardSummary } from '../services/DashboardService.js';
 import { exportRecords, openExportFile } from '../services/ExportService.js';
+import { backupDatabase, restoreDatabase } from '../services/BackupService.js';
 import {
   checkForAppUpdates,
   downloadAppUpdate,
@@ -95,6 +96,8 @@ export const registerIpcHandlers = (): void => {
   ipcMain.handle('dashboard:summary', async () => getDashboardSummary());
   ipcMain.handle('export:records', async (_event, payload: ExportRequest) => exportRecords(payload));
   ipcMain.handle('export:open-file', async (_event, filePath: string) => openExportFile(filePath));
+  ipcMain.handle('backup:create', async () => backupDatabase());
+  ipcMain.handle('backup:restore', async () => restoreDatabase());
 
   ipcMain.handle('updater:status', async () => getUpdaterStatusSnapshot());
   ipcMain.handle('updater:check', async () => checkForAppUpdates());

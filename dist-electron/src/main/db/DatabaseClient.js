@@ -2,6 +2,7 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { schemaSql } from './schema.js';
 let db = null;
+let databaseFilePath = null;
 const runSchema = (database) => {
     const transaction = database.transaction(() => {
         schemaSql.forEach((statement) => {
@@ -38,6 +39,7 @@ export const initializeDatabase = async (userDataPath) => {
     const dbPath = path.join(userDataPath, 'home-ledger.db');
     try {
         db = new Database(dbPath);
+        databaseFilePath = dbPath;
         db.pragma('journal_mode = WAL');
         db.pragma('foreign_keys = ON');
         runSchema(db);
@@ -45,6 +47,7 @@ export const initializeDatabase = async (userDataPath) => {
     }
     catch (error) {
         db = null;
+        databaseFilePath = null;
         throw error;
     }
 };
@@ -53,4 +56,17 @@ export const getDatabase = () => {
         throw new Error('Database not initialized.');
     }
     return db;
+};
+export const getDatabasePath = () => {
+    if (!databaseFilePath) {
+        throw new Error('Database path is unavailable because the database is not initialized.');
+    }
+    return databaseFilePath;
+};
+export const closeDatabase = () => {
+    if (!db) {
+        return;
+    }
+    db.close();
+    db = null;
 };

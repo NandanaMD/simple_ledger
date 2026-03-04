@@ -5,6 +5,8 @@ import type {
   CategoryInput,
   ExportRequest,
   ExportResult,
+  BackupResult,
+  RestoreResult,
   LabourEntry,
   LabourEntryInput,
   DashboardSummary,
@@ -43,6 +45,8 @@ export interface ElectronApi {
   getDashboardSummary: () => Promise<DashboardSummary>;
   exportRecords: (payload: ExportRequest) => Promise<ExportResult>;
   openExportFile: (filePath: string) => Promise<void>;
+  backupDatabase: () => Promise<BackupResult>;
+  restoreDatabase: () => Promise<RestoreResult>;
   getUpdaterStatus: () => Promise<UpdaterStatus>;
   checkForUpdates: () => Promise<UpdaterStatus>;
   downloadUpdate: () => Promise<UpdaterStatus>;
